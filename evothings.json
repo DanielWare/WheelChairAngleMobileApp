@@ -1,0 +1,17 @@
+{
+  "name": "my-first-scanner",
+  "version": "1.0",
+  "title": "MyFirstScanner",
+  "description": "A basic scanning app.",
+  "tags": [],
+  "libraries": [
+    {
+      "name": "jquery",
+      "version": "2.1.1"
+    }
+  ],
+  "index-file": "index.html",
+  "uuid": "a66e056b-8465-49a3-b490-529e528f21a3",
+  "icon": "app-icon.png",
+  "doc-url": "https://evothings.com/2.1/doc/examples/template-basic-app.html"
+}

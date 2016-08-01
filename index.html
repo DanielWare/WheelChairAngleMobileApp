@@ -1,0 +1,255 @@
+<!DOCTYPE html>
+<html>
+
+<head>
+	<script>console.log = hyper.log</script>
+	<script src="https://ajax.googleapis.com/ajax/libs/jquery/1.12.4/jquery.min.js"></script>
+	<meta charset="utf-8" />
+	<meta name="viewport" content="width=device-width, user-scalable=no,
+		shrink-to-fit=no, initial-scale=1.0, minimum-scale=1.0, maximum-scale=1.0" />
+
+	<title>My First Scan</title>
+
+	<style>
+		@import 'ui/css/evothings-app.css';
+	</style>
+
+	<script>
+	// Redirect console.log to Evothings Workbench.
+	if (window.hyper && window.hyper.log) { console.log = hyper.log }
+	</script>
+
+</head>
+
+<body ontouchstart=""><!-- ontouchstart="" enables low-delay CSS transitions. -->
+
+	<header>
+		<!--<button class="back" onclick="history.back()">
+			<img src="ui/images/menu.svg" />
+		</button> 
+
+		<img class="logotype" src="ui/images/logo.svg" alt="Evothings" /> -->
+		<div align = "center">
+			<button align="center" class="green" onclick="history.go(0)" style=>REFRESH</button>
+		</div>
+	</header>
+
+	<div id="scanner" style="display:inline">
+		<h1>Bluetooth Scanner</h1>
+
+		<b id="status">Status: Idle</b>
+		<br/>
+		<button onclick="startScan();">Start Scan</button>
+		<button onclick="stopScan();">Stop Scan</button>
+
+
+		<ul id="device-list">
+			<b>BLE Devices</b>
+		</ul>
+
+	</div>
+
+	<div id="properties" style="display:none">
+		<h1 id="device-name">error</h1>
+		<button id="connect-btn" onClick="connectToSelectedDevice();">Connect</button>
+		<br/>
+		<h2 id="device-connection-status">waiting...</h2>
+		<br/>
+		<ul id="device-services">
+			<b>Device Services</b>
+		</ul>
+		<br/>
+		<ul id="device-chars">
+			<b>Device Characteristics</b>
+		</ul>
+	</div>
+
+	<div id="gyro" style="display:none">
+		<h2>Reading Characteristic</h2>
+		<br/>
+		<h1 id="111"></h1>
+
+	</div>
+
+
+	<script src="cordova.js"></script>
+	<script src="libs/evothings/evothings.js"></script>
+	<script src="libs/evothings/ui/ui.js"></script>
+	<script src="easyble.dist.js"></script>
+
+	<script type="text/javascript">
+		var devices = [];
+		
+		var selectedDevice = null;
+
+		var selectedDeviceHandle = null;
+
+		var selectedDeviceServiceHandle = null;
+
+		var selectedDeviceCharacteristicHandle = null;
+
+		var selectedService = null;
+
+		var selectedCharacteristic = null;
+
+		var timer = null;
+
+		function startScan(){
+			$('#status').html('Status: Scanning');
+			evothings.ble.startScan(
+				function(device){
+
+					var count = devices.length;
+					var newDevice = true;
+					for(var i=0; i<count;i++){
+						if(devices[i].name === device.name){
+							newDevice = false;
+							break;
+						}
+					}
+					if(newDevice){
+						console.log('BLE found:' + device.name + ' id:' + device.address);
+						$('#device-list').append('<li><button id="'+ device.address +'" onClick="showId(this.id);">' + device.name + '</button></li>');
+						devices.push(device);
+					}					
+				},
+				function(error){
+					console.log('BLE error:' + error);
+				}
+			);
+		}
+
+		function stopScan(){
+			$('#status').html('Status: Idle');
+			evothings.ble.stopScan();
+		}
+
+		function showId(id){
+			console.log('id = ' + id);
+			stopScan();
+			document.getElementById('scanner').style.display = "none";
+			document.getElementById('properties').style.display = "inline";
+			for(var i=0;i<devices.length;i++){
+				if(devices[i].address === id){
+					selectedDevice = devices[i];
+					break;
+				}
+			}
+
+			$('#device-name').html(selectedDevice.name);
+
+		}
+
+		function connectToSelectedDevice(){
+			stopScan();
+			evothings.ble.connect(
+				selectedDevice.address,
+				function(device){
+					selectedDevice = device;
+					console.log('BLE connect status for device: '
+						+ device.deviceHandle
+						+ ' state: '
+						+ device.state);
+					selectedDeviceHandle = device.deviceHandle;
+					var htmlstate = "Connect";
+					switch(device.state){
+						case 0:
+							break;
+						case 1:
+							htmlstate = "Connecting";
+							break;
+						case 2:
+							htmlstate = "Connected";
+							showDeviceInfo(device);
+							showServices(device);
+							break;
+					}
+					$('#device-connection-status').html(htmlstate);
+				},
+				function(error){
+					console.log('BLE connect error: ' + error);
+				}
+			);
+		}
+
+		function showDeviceInfo(info){
+			console.log(info.deviceHandle);
+			for(var data in info){
+				console.log(data);
+			}
+
+		}
+
+		function showServices(connInfo){
+			console.log("reading services for " + connInfo.deviceHandle);
+			evothings.ble.readAllServiceData(
+				connInfo.deviceHandle,
+				function(services){
+					for(var key in services[0]){
+						console.log("char: " + key);
+					}
+					selectedService = services[0];
+					console.log("uuid = " + selectedService.uuid);
+
+					for(var c in selectedService.characteristics[0]){
+						console.log(c);
+					}
+					$('#device-services').append('<li><button onClick="selectService();">' + selectedService.uuid + '</button></li>');
+				},
+				function(error){
+					console.log("service error " + error);
+				});
+		}
+
+		function selectService(){
+			//go to next page
+			serviceHandle = selectedService.handle;
+			selectedDeviceServiceHandle = serviceHandle;
+			evothings.ble.characteristics(
+				selectedDeviceHandle,
+				serviceHandle,
+				function(characteristics)
+				{
+					for (var i = 0; i < characteristics.length; i++)
+					{
+						var characteristic = characteristics[i];
+						selectedCharacteristic = characteristic;
+						console.log('BLE characteristic: ' + characteristic.uuid);
+						$('#device-chars').append('<li><button onClick="selectCharacteristic();">' + characteristic.uuid + '</button></li>');
+					}
+					selectedDeviceCharacteristicHandle = characteristics[0].handle;
+				},
+				function(errorCode)
+				{
+					console.log('BLE characteristics error: ' + errorCode);
+				});
+		}
+
+		function selectCharacteristic(){
+			document.getElementById('scanner').style.display = "none";
+			document.getElementById('properties').style.display = "none";
+			document.getElementById('gyro').style.display = "inline";
+			timer = setInterval(readCharacteristic, 100);
+		}
+
+		function readCharacteristic(){
+			//$('#111').empty();
+			evothings.ble.readCharacteristic(
+				selectedDeviceHandle,
+				selectedDeviceCharacteristicHandle,
+				function(data){
+					var newData = evothings.ble.fromUtf8(data);
+					console.log(newData.charCodeAt(0));
+					$('#111').html(newData.charCodeAt(0));
+				},
+				function(error){
+					console.log("read char error: " + error);
+				}
+			);
+		}
+
+
+	</script>
+</body>
+
+</html>
